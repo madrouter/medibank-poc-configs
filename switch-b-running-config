@@ -1,0 +1,553 @@
+
+!Command: show running-config
+!Running configuration last done at: Fri Jul 10 12:28:48 2020
+!Time: Fri Jul 10 12:29:23 2020
+
+version 7.0(3)I7(8) Bios:version  
+hostname switch-b
+vdc switch-b id 1
+  limit-resource vlan minimum 16 maximum 4094
+  limit-resource vrf minimum 2 maximum 4096
+  limit-resource port-channel minimum 0 maximum 511
+  limit-resource u4route-mem minimum 248 maximum 248
+  limit-resource u6route-mem minimum 96 maximum 96
+  limit-resource m4route-mem minimum 58 maximum 58
+  limit-resource m6route-mem minimum 8 maximum 8
+
+nv overlay evpn
+feature bgp
+feature fabric forwarding
+feature interface-vlan
+feature vn-segment-vlan-based
+feature nv overlay
+
+no password strength-check
+username admin password 5 $5$OMHIHI$4rzXWyQKpHN9/qxYL6P68Ci0f1AgT2AvGcloOeoCHaA  role network-admin
+ip domain-lookup
+ip name-server 8.8.4.4 use-vrf management
+copp profile strict
+snmp-server user admin network-admin auth md5 0xa0592966a86174abd3d57ff712f93617 priv 0xa0592966a86174abd3d57ff712f93617 localizedkey
+rmon event 1 description FATAL(1) owner PMON@FATAL
+rmon event 2 description CRITICAL(2) owner PMON@CRITICAL
+rmon event 3 description ERROR(3) owner PMON@ERROR
+rmon event 4 description WARNING(4) owner PMON@WARNING
+rmon event 5 description INFORMATION(5) owner PMON@INFO
+
+fabric forwarding anycast-gateway-mac 2020.0000.00aa
+vlan 1,10-11,20-21,100-101,200-201,1000-1002
+vlan 10
+  name Tenant1_SiteA
+  vn-segment 10010
+vlan 11
+  name Tenant2_SiteA
+  vn-segment 10011
+vlan 20
+  name Tenant1_SiteB
+  vn-segment 10020
+vlan 21
+  name Tenant2_SiteB
+  vn-segment 10021
+vlan 100
+  name FW_DCI_Link
+  vn-segment 10100
+vlan 101
+  name Tenant_FW_Uplink
+vlan 200
+  name Common_Tenant2_Link
+vlan 201
+  name Common_Tenant1_Link
+vlan 1000
+  name L3_Tenant
+  vn-segment 91000
+vlan 1001
+  name L3_Tenant2
+  vn-segment 91001
+vlan 1002
+  name Common_VRF_L3
+  vn-segment 91002
+
+spanning-tree port type edge default
+spanning-tree port type edge bpduguard default
+ip prefix-list HOST_ROUTES seq 5 permit 0.0.0.0/0 eq 32 
+ip prefix-list site-a-hosts seq 5 permit 10.1.1.0/24 eq 32 
+ip prefix-list site-a-hosts seq 10 permit 10.2.1.0/24 eq 32 
+ip prefix-list site-a-nets seq 5 permit 10.1.1.0/24 
+ip prefix-list site-a-nets seq 10 permit 10.2.1.0/24 
+ip prefix-list site-a-snat-pool seq 5 permit 10.3.1.0/24 
+ip prefix-list site-b-hosts seq 5 permit 10.1.2.0/24 eq 32 
+ip prefix-list site-b-hosts seq 10 permit 10.2.2.0/24 eq 32 
+ip prefix-list site-b-nets seq 5 permit 10.1.2.0/24 
+ip prefix-list site-b-nets seq 10 permit 10.2.2.0/24 
+ip as-path access-list SITE_A_ASN seq 1 permit "64512$"
+ip as-path access-list SITE_B_ASN seq 1 permit "^$"
+ip community-list standard site-a-redist-static seq 1 permit 65522:1 
+route-map ALLOW_HOST_ROUTES permit 10
+  match ip address prefix-list HOST_ROUTES 
+route-map BGP-IN-FROM-FW permit 10
+  match community site-a-redist-static 
+  set local-preference 150
+route-map BGP-IN-FROM-FW permit 100
+route-map BGP-OUT-TO-FW deny 10
+  match ip address prefix-list site-b-hosts 
+route-map BGP-OUT-TO-FW deny 20
+  match as-path SITE_A_ASN 
+  match ip address prefix-list site-a-hosts 
+route-map BGP-OUT-TO-FW permit 30
+  match ip address prefix-list site-a-nets 
+  set as-path prepend 2 
+route-map BGP-OUT-TO-FW permit 1000
+route-map REDIST_DIRECT permit 10
+route-map Tenant2_Host_Routes permit 10
+  match ip address prefix-list HOST_ROUTES 
+  set community 64615:1 
+route-map Tenant_Host_Routes permit 10
+  set community 64613:1 
+vrf context Common
+  vni 91002
+  rd auto
+  address-family ipv4 unicast
+    route-target both auto
+    route-target both auto evpn
+vrf context Tenant
+  vni 91000
+  rd auto
+  address-family ipv4 unicast
+    route-target both auto
+    route-target both auto evpn
+vrf context Tenant2
+  vni 91001
+  rd auto
+  address-family ipv4 unicast
+    route-target both auto
+    route-target both auto evpn
+vrf context management
+  ip route 0.0.0.0/0 10.0.1.138
+
+
+interface Vlan1
+
+interface Vlan10
+  no shutdown
+  vrf member Tenant
+  ip address 10.1.1.254/24
+  fabric forwarding mode anycast-gateway
+
+interface Vlan11
+  no shutdown
+  vrf member Tenant2
+  ip address 10.2.1.254/24
+  fabric forwarding mode anycast-gateway
+
+interface Vlan20
+  no shutdown
+  vrf member Tenant
+  ip address 10.1.2.254/24
+  fabric forwarding mode anycast-gateway
+
+interface Vlan21
+  no shutdown
+  vrf member Tenant2
+  ip address 10.2.2.254/24
+  fabric forwarding mode anycast-gateway
+
+interface Vlan100
+  no shutdown
+  vrf member Tenant2
+  ip address 192.168.255.6/31
+
+interface Vlan101
+  no shutdown
+  vrf member Tenant
+  ip address 192.168.255.2/31
+
+interface Vlan200
+  no shutdown
+  vrf member Common
+  ip address 192.168.254.6/31
+
+interface Vlan201
+  no shutdown
+  vrf member Common
+  ip address 192.168.254.2/31
+
+interface Vlan1000
+  no shutdown
+  vrf member Tenant
+  ip forward
+
+interface Vlan1001
+  no shutdown
+  vrf member Tenant2
+  ip forward
+
+interface Vlan1002
+  no shutdown
+  vrf member Common
+  ip forward
+
+interface nve1
+  no shutdown
+  host-reachability protocol bgp
+  source-interface loopback1
+  member vni 10010
+    ingress-replication protocol bgp
+  member vni 10011
+    ingress-replication protocol bgp
+  member vni 10020
+    ingress-replication protocol bgp
+  member vni 10021
+    ingress-replication protocol bgp
+  member vni 10100
+    ingress-replication protocol bgp
+  member vni 91000 associate-vrf
+  member vni 91001 associate-vrf
+  member vni 91002 associate-vrf
+
+interface Ethernet1/1
+  switchport mode trunk
+  switchport trunk allowed vlan 100-101,200-201
+
+interface Ethernet1/2
+  switchport mode trunk
+  spanning-tree port type edge trunk
+
+interface Ethernet1/3
+
+interface Ethernet1/4
+
+interface Ethernet1/5
+
+interface Ethernet1/6
+
+interface Ethernet1/7
+  no switchport
+  ip address 10.0.2.1/31
+  no shutdown
+
+interface Ethernet1/8
+
+interface Ethernet1/9
+
+interface Ethernet1/10
+
+interface Ethernet1/11
+
+interface Ethernet1/12
+
+interface Ethernet1/13
+
+interface Ethernet1/14
+
+interface Ethernet1/15
+
+interface Ethernet1/16
+
+interface Ethernet1/17
+
+interface Ethernet1/18
+
+interface Ethernet1/19
+
+interface Ethernet1/20
+
+interface Ethernet1/21
+
+interface Ethernet1/22
+
+interface Ethernet1/23
+
+interface Ethernet1/24
+
+interface Ethernet1/25
+
+interface Ethernet1/26
+
+interface Ethernet1/27
+
+interface Ethernet1/28
+
+interface Ethernet1/29
+
+interface Ethernet1/30
+
+interface Ethernet1/31
+
+interface Ethernet1/32
+
+interface Ethernet1/33
+
+interface Ethernet1/34
+
+interface Ethernet1/35
+
+interface Ethernet1/36
+
+interface Ethernet1/37
+
+interface Ethernet1/38
+
+interface Ethernet1/39
+
+interface Ethernet1/40
+
+interface Ethernet1/41
+
+interface Ethernet1/42
+
+interface Ethernet1/43
+
+interface Ethernet1/44
+
+interface Ethernet1/45
+
+interface Ethernet1/46
+
+interface Ethernet1/47
+
+interface Ethernet1/48
+
+interface Ethernet1/49
+
+interface Ethernet1/50
+
+interface Ethernet1/51
+
+interface Ethernet1/52
+
+interface Ethernet1/53
+
+interface Ethernet1/54
+
+interface Ethernet1/55
+
+interface Ethernet1/56
+
+interface Ethernet1/57
+
+interface Ethernet1/58
+
+interface Ethernet1/59
+
+interface Ethernet1/60
+
+interface Ethernet1/61
+
+interface Ethernet1/62
+
+interface Ethernet1/63
+
+interface Ethernet1/64
+
+interface Ethernet1/65
+
+interface Ethernet1/66
+
+interface Ethernet1/67
+
+interface Ethernet1/68
+
+interface Ethernet1/69
+
+interface Ethernet1/70
+
+interface Ethernet1/71
+
+interface Ethernet1/72
+
+interface Ethernet1/73
+
+interface Ethernet1/74
+
+interface Ethernet1/75
+
+interface Ethernet1/76
+
+interface Ethernet1/77
+
+interface Ethernet1/78
+
+interface Ethernet1/79
+
+interface Ethernet1/80
+
+interface Ethernet1/81
+
+interface Ethernet1/82
+
+interface Ethernet1/83
+
+interface Ethernet1/84
+
+interface Ethernet1/85
+
+interface Ethernet1/86
+
+interface Ethernet1/87
+
+interface Ethernet1/88
+
+interface Ethernet1/89
+
+interface Ethernet1/90
+
+interface Ethernet1/91
+
+interface Ethernet1/92
+
+interface Ethernet1/93
+
+interface Ethernet1/94
+
+interface Ethernet1/95
+
+interface Ethernet1/96
+
+interface Ethernet1/97
+
+interface Ethernet1/98
+
+interface Ethernet1/99
+
+interface Ethernet1/100
+
+interface Ethernet1/101
+
+interface Ethernet1/102
+
+interface Ethernet1/103
+
+interface Ethernet1/104
+
+interface Ethernet1/105
+
+interface Ethernet1/106
+
+interface Ethernet1/107
+
+interface Ethernet1/108
+
+interface Ethernet1/109
+
+interface Ethernet1/110
+
+interface Ethernet1/111
+
+interface Ethernet1/112
+
+interface Ethernet1/113
+
+interface Ethernet1/114
+
+interface Ethernet1/115
+
+interface Ethernet1/116
+
+interface Ethernet1/117
+
+interface Ethernet1/118
+
+interface Ethernet1/119
+
+interface Ethernet1/120
+
+interface Ethernet1/121
+
+interface Ethernet1/122
+
+interface Ethernet1/123
+
+interface Ethernet1/124
+
+interface Ethernet1/125
+
+interface Ethernet1/126
+
+interface Ethernet1/127
+
+interface Ethernet1/128
+
+interface mgmt0
+  ip address dhcp
+  vrf member management
+
+interface loopback0
+  ip address 10.0.0.2/32
+
+interface loopback1
+  ip address 10.0.1.2/32
+line console
+line vty
+boot nxos bootflash:/nxos.7.0.3.I7.8.bin 
+router bgp 64513
+  address-family ipv4 unicast
+    network 10.0.1.2/32
+  template peer firewall-peer
+    address-family ipv4 unicast
+      send-community
+  template peer multisite-peer
+    peer-type fabric-external
+    address-family ipv4 unicast
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+      rewrite-evpn-rt-asn
+  neighbor 10.0.2.0
+    inherit peer multisite-peer
+    remote-as 64512
+  vrf Common
+    address-family ipv4 unicast
+      advertise l2vpn evpn
+    neighbor 192.168.254.3
+      inherit peer firewall-peer
+      remote-as 65513
+      address-family ipv4 unicast
+    neighbor 192.168.254.7
+      inherit peer firewall-peer
+      remote-as 65523
+      address-family ipv4 unicast
+  vrf Tenant
+    local-as 64613
+    address-family ipv4 unicast
+      advertise l2vpn evpn
+      redistribute direct route-map REDIST_DIRECT
+      redistribute hmm route-map REDIST_DIRECT
+    neighbor 192.168.255.3
+      inherit peer firewall-peer
+      remote-as 65513
+      address-family ipv4 unicast
+        route-map BGP-IN-FROM-FW in
+        route-map BGP-OUT-TO-FW out
+  vrf Tenant2
+    local-as 64615
+    address-family ipv4 unicast
+      advertise l2vpn evpn
+    neighbor 192.168.255.7
+      inherit peer firewall-peer
+      remote-as 65523
+      address-family ipv4 unicast
+        route-map BGP-OUT-TO-FW out
+evpn
+  vni 10010 l2
+    rd auto
+    route-target import auto
+    route-target export auto
+  vni 10011 l2
+    rd auto
+    route-target import auto
+    route-target export auto
+  vni 10020 l2
+    rd auto
+    route-target import auto
+    route-target export auto
+  vni 10021 l2
+    rd auto
+    route-target import auto
+    route-target export auto
+  vni 10100 l2
+    rd auto
+    route-target import auto
+    route-target export auto
+
+no logging console
+
+
