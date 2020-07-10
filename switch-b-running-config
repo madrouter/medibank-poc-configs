@@ -1,7 +1,7 @@
 
 !Command: show running-config
-!Running configuration last done at: Fri Jul 10 12:28:48 2020
-!Time: Fri Jul 10 12:29:23 2020
+!Running configuration last done at: Fri Jul 10 13:20:59 2020
+!Time: Fri Jul 10 13:24:16 2020
 
 version 7.0(3)I7(8) Bios:version  
 hostname switch-b
@@ -89,19 +89,19 @@ route-map BGP-IN-FROM-FW permit 10
 route-map BGP-IN-FROM-FW permit 100
 route-map BGP-OUT-TO-FW deny 10
   match ip address prefix-list site-b-hosts 
-route-map BGP-OUT-TO-FW deny 20
-  match as-path SITE_A_ASN 
-  match ip address prefix-list site-a-hosts 
-route-map BGP-OUT-TO-FW permit 30
+route-map BGP-OUT-TO-FW permit 20
+  match as-path SITE_B_ASN 
+  match ip address prefix-list HOST_ROUTES 
+route-map BGP-OUT-TO-FW deny 30
+  match ip address prefix-list HOST_ROUTES 
+route-map BGP-OUT-TO-FW permit 40
   match ip address prefix-list site-a-nets 
   set as-path prepend 2 
 route-map BGP-OUT-TO-FW permit 1000
+  match as-path SITE_A_ASN 
+route-map BGP-OUT-TO-FW permit 1010
+  match as-path SITE_B_ASN 
 route-map REDIST_DIRECT permit 10
-route-map Tenant2_Host_Routes permit 10
-  match ip address prefix-list HOST_ROUTES 
-  set community 64615:1 
-route-map Tenant_Host_Routes permit 10
-  set community 64613:1 
 vrf context Common
   vni 91002
   rd auto
@@ -481,6 +481,7 @@ boot nxos bootflash:/nxos.7.0.3.I7.8.bin
 router bgp 64513
   address-family ipv4 unicast
     network 10.0.1.2/32
+  address-family l2vpn evpn
   template peer firewall-peer
     address-family ipv4 unicast
       send-community
@@ -509,8 +510,6 @@ router bgp 64513
     local-as 64613
     address-family ipv4 unicast
       advertise l2vpn evpn
-      redistribute direct route-map REDIST_DIRECT
-      redistribute hmm route-map REDIST_DIRECT
     neighbor 192.168.255.3
       inherit peer firewall-peer
       remote-as 65513

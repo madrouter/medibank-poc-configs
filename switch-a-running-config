@@ -1,7 +1,7 @@
 
 !Command: show running-config
-!Running configuration last done at: Fri Jul 10 12:28:25 2020
-!Time: Fri Jul 10 12:29:07 2020
+!Running configuration last done at: Fri Jul 10 13:21:39 2020
+!Time: Fri Jul 10 13:23:55 2020
 
 version 7.0(3)I7(8) Bios:version  
 hostname switch-a
@@ -89,12 +89,18 @@ route-map BGP-IN-FROM-FW permit 10
 route-map BGP-IN-FROM-FW permit 100
 route-map BGP-OUT-TO-FW deny 10
   match ip address prefix-list site-a-hosts 
-route-map BGP-OUT-TO-FW deny 20
-  match as-path SITE_B_ASN 
-route-map BGP-OUT-TO-FW permit 30
+route-map BGP-OUT-TO-FW permit 20
+  match as-path SITE_A_ASN 
+  match ip address prefix-list HOST_ROUTES 
+route-map BGP-OUT-TO-FW deny 30
+  match ip address prefix-list HOST_ROUTES 
+route-map BGP-OUT-TO-FW permit 40
   match ip address prefix-list site-b-nets 
   set as-path prepend 2 
 route-map BGP-OUT-TO-FW permit 1000
+  match as-path SITE_A_ASN 
+route-map BGP-OUT-TO-FW permit 1010
+  match as-path SITE_B_ASN 
 route-map REDIST_DIRECT permit 10
 vrf context Common
   vni 91002
@@ -203,7 +209,7 @@ interface Ethernet1/1
 
 interface Ethernet1/2
   switchport mode trunk
-  switchport access vlan 10
+  spanning-tree port type edge trunk
 
 interface Ethernet1/3
 
@@ -503,7 +509,6 @@ router bgp 64512
     local-as 64612
     address-family ipv4 unicast
       advertise l2vpn evpn
-      redistribute direct route-map REDIST_DIRECT
     neighbor 192.168.255.1
       inherit peer firewall-peer
       remote-as 65512
@@ -514,8 +519,6 @@ router bgp 64512
     local-as 64614
     address-family ipv4 unicast
       advertise l2vpn evpn
-      redistribute direct route-map REDIST_DIRECT
-      redistribute hmm route-map REDIST_DIRECT
     neighbor 192.168.255.5
       inherit peer firewall-peer
       remote-as 65522
