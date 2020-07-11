@@ -1,7 +1,7 @@
 
 !Command: show running-config
-!Running configuration last done at: Fri Jul 10 13:20:59 2020
-!Time: Fri Jul 10 13:24:16 2020
+!Running configuration last done at: Sat Jul 11 11:06:57 2020
+!Time: Sat Jul 11 11:20:35 2020
 
 version 7.0(3)I7(8) Bios:version  
 hostname switch-b
@@ -79,29 +79,41 @@ ip prefix-list site-b-hosts seq 10 permit 10.2.2.0/24 eq 32
 ip prefix-list site-b-nets seq 5 permit 10.1.2.0/24 
 ip prefix-list site-b-nets seq 10 permit 10.2.2.0/24 
 ip as-path access-list SITE_A_ASN seq 1 permit "64512$"
+ip as-path access-list SITE_A_TENANT2_ASN seq 1 permit "64614$"
+ip as-path access-list SITE_A_TENANT_ASN seq 1 permit "64612$"
 ip as-path access-list SITE_B_ASN seq 1 permit "^$"
 ip community-list standard site-a-redist-static seq 1 permit 65522:1 
 route-map ALLOW_HOST_ROUTES permit 10
   match ip address prefix-list HOST_ROUTES 
 route-map BGP-IN-FROM-FW permit 10
-  match community site-a-redist-static 
+  match as-path SITE_A_TENANT_ASN 
+route-map BGP-IN-FROM-FW permit 1000
   set local-preference 150
-route-map BGP-IN-FROM-FW permit 100
+route-map BGP-IN-FROM-TENANTS permit 10
+  match ip address prefix-list site-a-nets 
+  set local-preference 50
+route-map BGP-IN-FROM-TENANTS permit 1000
 route-map BGP-OUT-TO-FW deny 10
+  description Deny /32 from local subnets.
   match ip address prefix-list site-b-hosts 
 route-map BGP-OUT-TO-FW permit 20
+  description Permit /32 locally originated from foreign subnets.
   match as-path SITE_B_ASN 
   match ip address prefix-list HOST_ROUTES 
 route-map BGP-OUT-TO-FW deny 30
+  description Deny /32 not locally originated.
   match ip address prefix-list HOST_ROUTES 
-route-map BGP-OUT-TO-FW permit 40
-  match ip address prefix-list site-a-nets 
-  set as-path prepend 2 
 route-map BGP-OUT-TO-FW permit 1000
+  description Allow all other routes from either site.
   match as-path SITE_A_ASN 
 route-map BGP-OUT-TO-FW permit 1010
+  description Allow all other routes from either site.
   match as-path SITE_B_ASN 
 route-map REDIST_DIRECT permit 10
+route-map T2_BGP-IN-FROM-FW permit 10
+  match as-path SITE_A_TENANT2_ASN 
+route-map T2_BGP-IN-FROM-FW permit 1000
+  set local-preference 150
 vrf context Common
   vni 91002
   rd auto
@@ -502,14 +514,18 @@ router bgp 64513
       inherit peer firewall-peer
       remote-as 65513
       address-family ipv4 unicast
+        route-map BGP-IN-FROM-TENANTS in
     neighbor 192.168.254.7
       inherit peer firewall-peer
       remote-as 65523
       address-family ipv4 unicast
+        route-map BGP-IN-FROM-TENANTS in
   vrf Tenant
     local-as 64613
     address-family ipv4 unicast
       advertise l2vpn evpn
+      redistribute direct route-map REDIST_DIRECT
+      redistribute hmm route-map ALLOW_HOST_ROUTES
     neighbor 192.168.255.3
       inherit peer firewall-peer
       remote-as 65513
@@ -520,10 +536,13 @@ router bgp 64513
     local-as 64615
     address-family ipv4 unicast
       advertise l2vpn evpn
+      redistribute direct route-map REDIST_DIRECT
+      redistribute hmm route-map ALLOW_HOST_ROUTES
     neighbor 192.168.255.7
       inherit peer firewall-peer
       remote-as 65523
       address-family ipv4 unicast
+        route-map T2_BGP-IN-FROM-FW in
         route-map BGP-OUT-TO-FW out
 evpn
   vni 10010 l2
