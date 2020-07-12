@@ -1,7 +1,7 @@
 
 !Command: show running-config
-!Running configuration last done at: Sat Jul 11 11:06:57 2020
-!Time: Sat Jul 11 11:20:35 2020
+!Running configuration last done at: Sun Jul 12 05:25:22 2020
+!Time: Sun Jul 12 05:56:26 2020
 
 version 7.0(3)I7(8) Bios:version  
 hostname switch-b
@@ -92,6 +92,9 @@ route-map BGP-IN-FROM-FW permit 1000
 route-map BGP-IN-FROM-TENANTS permit 10
   match ip address prefix-list site-a-nets 
   set local-preference 50
+route-map BGP-IN-FROM-TENANTS permit 20
+  match community site-a-redist-static 
+  set local-preference 150
 route-map BGP-IN-FROM-TENANTS permit 1000
 route-map BGP-OUT-TO-FW deny 10
   description Deny /32 from local subnets.
