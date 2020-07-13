@@ -1,7 +1,7 @@
 
 !Command: show running-config
-!Running configuration last done at: Sun Jul 12 05:25:22 2020
-!Time: Sun Jul 12 05:56:26 2020
+!Running configuration last done at: Mon Jul 13 11:59:41 2020
+!Time: Mon Jul 13 12:15:29 2020
 
 version 7.0(3)I7(8) Bios:version  
 hostname switch-b
@@ -68,6 +68,7 @@ vlan 1002
 
 spanning-tree port type edge default
 spanning-tree port type edge bpduguard default
+ip prefix-list DEFAULT seq 5 permit 0.0.0.0/0 
 ip prefix-list HOST_ROUTES seq 5 permit 0.0.0.0/0 eq 32 
 ip prefix-list site-a-hosts seq 5 permit 10.1.1.0/24 eq 32 
 ip prefix-list site-a-hosts seq 10 permit 10.2.1.0/24 eq 32 
@@ -112,29 +113,43 @@ route-map BGP-OUT-TO-FW permit 1000
 route-map BGP-OUT-TO-FW permit 1010
   description Allow all other routes from either site.
   match as-path SITE_B_ASN 
+route-map EVPN_LOWER_LOCAL_PREF permit 1000
+  set local-preference 50
 route-map REDIST_DIRECT permit 10
 route-map T2_BGP-IN-FROM-FW permit 10
   match as-path SITE_A_TENANT2_ASN 
 route-map T2_BGP-IN-FROM-FW permit 1000
   set local-preference 150
+route-map TEST permit 10
+  match ip address prefix-list DEFAULT 
+  set local-preference 70
+  set community 65530:1 
+route-map TEST permit 1000
+route-map common-import-from-evpn permit 10
+  match ip address prefix-list site-a-nets 
+  set local-preference 150
+route-map common-import-from-evpn permit 1000
 vrf context Common
   vni 91002
   rd auto
   address-family ipv4 unicast
     route-target both auto
     route-target both auto evpn
+    import map common-import-from-evpn
 vrf context Tenant
   vni 91000
   rd auto
   address-family ipv4 unicast
     route-target both auto
     route-target both auto evpn
+    import map EVPN_LOWER_LOCAL_PREF
 vrf context Tenant2
   vni 91001
   rd auto
   address-family ipv4 unicast
     route-target both auto
     route-target both auto evpn
+    import map EVPN_LOWER_LOCAL_PREF
 vrf context management
   ip route 0.0.0.0/0 10.0.1.138
 
@@ -227,6 +242,7 @@ interface Ethernet1/2
   spanning-tree port type edge trunk
 
 interface Ethernet1/3
+  switchport access vlan 10
 
 interface Ethernet1/4
 
@@ -517,12 +533,12 @@ router bgp 64513
       inherit peer firewall-peer
       remote-as 65513
       address-family ipv4 unicast
-        route-map BGP-IN-FROM-TENANTS in
+        no route-map BGP-IN-FROM-TENANTS in
     neighbor 192.168.254.7
       inherit peer firewall-peer
       remote-as 65523
       address-family ipv4 unicast
-        route-map BGP-IN-FROM-TENANTS in
+        no route-map BGP-IN-FROM-TENANTS in
   vrf Tenant
     local-as 64613
     address-family ipv4 unicast
@@ -533,7 +549,7 @@ router bgp 64513
       inherit peer firewall-peer
       remote-as 65513
       address-family ipv4 unicast
-        route-map BGP-IN-FROM-FW in
+        no route-map BGP-IN-FROM-FW in
         route-map BGP-OUT-TO-FW out
   vrf Tenant2
     local-as 64615
@@ -545,7 +561,7 @@ router bgp 64513
       inherit peer firewall-peer
       remote-as 65523
       address-family ipv4 unicast
-        route-map T2_BGP-IN-FROM-FW in
+        no route-map T2_BGP-IN-FROM-FW in
         route-map BGP-OUT-TO-FW out
 evpn
   vni 10010 l2

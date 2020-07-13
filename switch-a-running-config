@@ -1,7 +1,7 @@
 
 !Command: show running-config
-!Running configuration last done at: Sun Jul 12 05:12:28 2020
-!Time: Sun Jul 12 05:56:14 2020
+!Running configuration last done at: Mon Jul 13 11:48:04 2020
+!Time: Mon Jul 13 12:14:49 2020
 
 version 7.0(3)I7(8) Bios:version  
 hostname switch-a
@@ -112,29 +112,38 @@ route-map BGP-OUT-TO-FW permit 1000
 route-map BGP-OUT-TO-FW permit 1010
   description Allow all other routes from either site.
   match as-path SITE_B_ASN 
+route-map EVPN_LOWER_LOCAL_PREF permit 1000
+  set local-preference 50
 route-map REDIST_DIRECT permit 10
 route-map T2_BGP-IN-FROM-FW permit 10
   match as-path SITE_B_TENANT2_ASN 
 route-map T2_BGP-IN-FROM-FW permit 1000
   set local-preference 150
+route-map common-import-from-evpn permit 10
+  match ip address prefix-list site-b-nets 
+  set local-preference 150
+route-map common-import-from-evpn permit 1000
 vrf context Common
   vni 91002
   rd auto
   address-family ipv4 unicast
     route-target both auto
     route-target both auto evpn
+    import map common-import-from-evpn
 vrf context Tenant
   vni 91000
   rd auto
   address-family ipv4 unicast
     route-target both auto
     route-target both auto evpn
+    import map EVPN_LOWER_LOCAL_PREF
 vrf context Tenant2
   vni 91001
   rd auto
   address-family ipv4 unicast
     route-target both auto
     route-target both auto evpn
+    import map EVPN_LOWER_LOCAL_PREF
 vrf context management
   ip route 0.0.0.0/0 10.0.1.138
 
@@ -227,6 +236,7 @@ interface Ethernet1/2
   spanning-tree port type edge trunk
 
 interface Ethernet1/3
+  switchport access vlan 10
 
 interface Ethernet1/4
 
@@ -517,12 +527,12 @@ router bgp 64512
       inherit peer firewall-peer
       remote-as 65512
       address-family ipv4 unicast
-        route-map BGP-IN-FROM-TENANTS in
+        no route-map BGP-IN-FROM-TENANTS in
     neighbor 192.168.254.5
       inherit peer firewall-peer
       remote-as 65522
       address-family ipv4 unicast
-        route-map BGP-IN-FROM-TENANTS in
+        no route-map BGP-IN-FROM-TENANTS in
   vrf Tenant
     local-as 64612
     address-family ipv4 unicast
@@ -533,7 +543,7 @@ router bgp 64512
       inherit peer firewall-peer
       remote-as 65512
       address-family ipv4 unicast
-        route-map BGP-IN-FROM-FW in
+        no route-map BGP-IN-FROM-FW in
         route-map BGP-OUT-TO-FW out
   vrf Tenant2
     local-as 64614
@@ -545,7 +555,7 @@ router bgp 64512
       inherit peer firewall-peer
       remote-as 65522
       address-family ipv4 unicast
-        route-map T2_BGP-IN-FROM-FW in
+        no route-map T2_BGP-IN-FROM-FW in
         route-map BGP-OUT-TO-FW out
 evpn
   vni 10010 l2
